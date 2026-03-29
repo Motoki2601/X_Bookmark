@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>X Bookmark Manager</title>
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3250;
+      --accent: #1d9bf0;
+      --accent-hover: #1a8cd8;
+      --text: #e7e9f0;
+      --text-muted: #8b8fa8;
+      --tag-bg: #1e2a3a;
+      --tag-color: #60a5fa;
+      --danger: #ef4444;
+      --radius: 12px;
+      --radius-sm: 6px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ===== Layout ===== */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 17, 23, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+    }
+
+    .header-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .header-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .search-bar {
+      flex: 1;
+      min-width: 180px;
+      position: relative;
+    }
+
+    .search-bar input {
+      width: 100%;
+      padding: 8px 12px 8px 36px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-bar input:focus { border-color: var(--accent); }
+
+    .search-bar .icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+      font-size: 0.85rem;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ===== Main ===== */
+    .main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* ===== Stats bar ===== */
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    .stats-bar strong { color: var(--text); }
+
+    /* ===== Tag filter ===== */
+    .tag-filter-section {
+      margin-bottom: 14px;
+    }
+
+    .tag-filter-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: var(--tag-bg);
+      color: var(--tag-color);
+      font-size: 0.8rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .tag-chip:hover { border-color: var(--tag-color); }
+    .tag-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    .tag-chip .remove-tag {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      line-height: 1;
+    }
+
+    .tag-chip .remove-tag:hover { opacity: 1; }
+
+    /* ===== Drop zone ===== */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 16px;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(29, 155, 240, 0.05);
+    }
+
+    .drop-zone .dz-icon { font-size: 2.4rem; margin-bottom: 10px; }
+    .drop-zone .dz-title { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+    .drop-zone .dz-sub { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* ===== Bookmark cards ===== */
+    .cards-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .card:hover { border-color: #3e4460; }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .card-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-author {
+      font-weight: 700;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-screen-name {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .card-date {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .card-text {
+      font-size: 0.9rem;
+      line-height: 1.55;
+      word-break: break-word;
+      white-space: pre-wrap;
+      margin-bottom: 10px;
+    }
+
+    .card-text a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .card-text a:hover { text-decoration: underline; }
+
+    .card-images {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 10px;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .card-images.count-1 { grid-template-columns: 1fr; }
+    .card-images.count-2 { grid-template-columns: 1fr 1fr; }
+    .card-images.count-3 { grid-template-columns: 1fr 1fr; }
+    .card-images.count-4 { grid-template-columns: 1fr 1fr; }
+
+    .card-images img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .card-images img:hover { opacity: 0.9; }
+
+    .card-images.count-3 img:first-child { grid-row: span 2; height: 100%; }
+
+    /* ===== Card tags ===== */
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .card-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--tag-bg);
+      color: var(--tag-color);
+      font-size: 0.78rem;
+      border: 1px solid transparent;
+    }
+
+    .card-tag .del-tag {
+      cursor: pointer;
+      opacity: 0.6;
+      font-size: 0.75rem;
+      line-height: 1;
+      padding: 0 1px;
+    }
+
+    .card-tag .del-tag:hover { opacity: 1; color: var(--danger); }
+
+    .add-tag-form {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .add-tag-input {
+      width: 100px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.78rem;
+      outline: none;
+    }
+
+    .add-tag-input:focus { border-color: var(--accent); }
+
+    .add-tag-btn {
+      padding: 2px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .add-tag-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .add-tag-trigger {
+      padding: 2px 8px;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .add-tag-trigger:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ===== Image lightbox ===== */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+
+    .lightbox.open { display: flex; }
+
+    .lightbox img {
+      max-width: 94vw;
+      max-height: 94vh;
+      object-fit: contain;
+      border-radius: var(--radius);
+    }
+
+    /* ===== Empty state ===== */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state .es-icon { font-size: 3rem; margin-bottom: 14px; }
+    .empty-state .es-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .empty-state .es-sub { font-size: 0.9rem; line-height: 1.6; }
+
+    /* ===== Toast ===== */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .toast {
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: #22c55e; color: #4ade80; }
+    .toast.error { border-color: var(--danger); color: #f87171; }
+
+    /* ===== Pagination ===== */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .page-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .page-btn:disabled { opacity: 0.35; cursor: default; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 600px) {
+      .header-inner { gap: 8px; }
+      .header-title { font-size: 1rem; }
+      .main { padding: 10px; }
+      .card-images img { height: 120px; }
+    }
+
+    /* ===== Scrollbar ===== */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4a4f70; }
+
+    /* hidden file input */
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+  <div class="header-inner">
+    <div class="header-title">
+      <span>🔖</span>
+      <span>X Bookmark Manager</span>
+    </div>
+    <div class="search-bar">
+      <span class="icon">🔍</span>
+      <input type="text" id="search-input" placeholder="キーワードで検索..." autocomplete="off" />
+    </div>
+    <label for="file-input" class="btn btn-primary">インポート</label>
+    <input type="file" id="file-input" accept=".json" />
+    <button class="btn btn-ghost" id="clear-btn" title="すべてのデータを削除">🗑 全削除</button>
+  </div>
+</header>
+
+<main class="main">
+  <!-- Stats bar -->
+  <div class="stats-bar" id="stats-bar">
+    <span>合計: <strong id="total-count">0</strong> 件</span>
+    <span>表示: <strong id="filtered-count">0</strong> 件</span>
+  </div>
+
+  <!-- Tag filter -->
+  <div class="tag-filter-section" id="tag-filter-section" style="display:none">
+    <div class="tag-filter-label">タグで絞り込み:</div>
+    <div class="tag-list" id="tag-filter-list"></div>
+  </div>
+
+  <!-- Drop zone (shown when no data) -->
+  <div class="drop-zone" id="drop-zone">
+    <div class="dz-icon">📂</div>
+    <div class="dz-title">bookmarks.json をドロップ</div>
+    <div class="dz-sub">またはクリックしてファイルを選択</div>
+  </div>
+
+  <!-- Cards -->
+  <div class="cards-grid" id="cards-grid"></div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination"></div>
+</main>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="拡大画像" />
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+'use strict';
+
+// ===== IndexedDB =====
+const DB_NAME = 'xbookmarks';
+const DB_VERSION = 1;
+const STORE_BOOKMARKS = 'bookmarks';
+const STORE_TAGS = 'tags'; // { id, tags: string[] }
+
+let db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE_BOOKMARKS)) {
+        d.createObjectStore(STORE_BOOKMARKS, { keyPath: 'id' });
+      }
+      if (!d.objectStoreNames.contains(STORE_TAGS)) {
+        d.createObjectStore(STORE_TAGS, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function dbTx(storeName, mode, fn) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, mode);
+    const store = tx.objectStore(storeName);
+    const req = fn(store);
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function getAllFromStore(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+    const req = store.getAll();
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function putToStore(storeName, obj) {
+  return dbTx(storeName, 'readwrite', (store) => store.put(obj));
+}
+
+function clearStore(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.clear();
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+// ===== App State =====
+let allBookmarks = []; // 全件（IndexedDBから取得）
+let tagsMap = {};       // { [id]: string[] }
+let searchQuery = '';
+let activeTag = null;
+let currentPage = 1;
+const PAGE_SIZE = 20;
+
+// ===== Toast =====
+function showToast(msg, type = '') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (type ? ' ' + type : '');
+  toast.textContent = msg;
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => toast.classList.add('show'));
+  });
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 350);
+  }, 3000);
+}
+
+// ===== Helpers =====
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function linkifyText(text) {
+  const escaped = escapeHtml(text);
+  // URL → リンク化
+  const urlRe = /(https?:\/\/[^\s<>"']+)/g;
+  // ハッシュタグ
+  const hashRe = /(#\w+)/g;
+  // メンション
+  const mentionRe = /(@\w+)/g;
+
+  return escaped
+    .replace(urlRe, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(hashRe, '<span style="color:var(--accent)">$1</span>')
+    .replace(mentionRe, '<span style="color:var(--accent)">$1</span>');
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
+
+function getInitial(name) {
+  if (!name) return '?';
+  return name.charAt(0).toUpperCase();
+}
+
+// ===== Filtering & Pagination =====
+function getFiltered() {
+  let list = allBookmarks;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter((b) =>
+      b.text.toLowerCase().includes(q) ||
+      b.author_name.toLowerCase().includes(q) ||
+      b.author_screen_name.toLowerCase().includes(q)
+    );
+  }
+  if (activeTag) {
+    list = list.filter((b) => {
+      const tags = tagsMap[b.id] || [];
+      return tags.includes(activeTag);
+    });
+  }
+  return list;
+}
+
+// ===== Render =====
+function renderStats(filtered) {
+  document.getElementById('total-count').textContent = allBookmarks.length;
+  document.getElementById('filtered-count').textContent = filtered.length;
+}
+
+function renderTagFilter() {
+  // 全タグ収集
+  const allTags = new Set();
+  Object.values(tagsMap).forEach((tags) => tags.forEach((t) => allTags.add(t)));
+
+  const section = document.getElementById('tag-filter-section');
+  const list = document.getElementById('tag-filter-list');
+  list.innerHTML = '';
+
+  if (allTags.size === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  // 全件チップ
+  const allChip = createEl('button', 'tag-chip' + (activeTag === null ? ' active' : ''), '全件');
+  allChip.addEventListener('click', () => {
+    activeTag = null;
+    currentPage = 1;
+    render();
+  });
+  list.appendChild(allChip);
+
+  allTags.forEach((tag) => {
+    const chip = createEl('button', 'tag-chip' + (activeTag === tag ? ' active' : ''), '#' + escapeHtml(tag));
+    chip.addEventListener('click', () => {
+      activeTag = activeTag === tag ? null : tag;
+      currentPage = 1;
+      render();
+    });
+    list.appendChild(chip);
+  });
+}
+
+function createEl(tag, className, textContent) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (textContent !== undefined) el.textContent = textContent;
+  return el;
+}
+
+function renderPagination(total) {
+  const container = document.getElementById('pagination');
+  container.innerHTML = '';
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) return;
+
+  const addBtn = (label, page, active = false, disabled = false) => {
+    const btn = createEl('button', 'page-btn' + (active ? ' active' : ''), label);
+    if (disabled) btn.disabled = true;
+    btn.addEventListener('click', () => {
+      if (!disabled && !active) {
+        currentPage = page;
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+    container.appendChild(btn);
+  };
+
+  addBtn('‹', currentPage - 1, false, currentPage === 1);
+
+  // 最大7ページボタン表示
+  let start = Math.max(1, currentPage - 3);
+  let end = Math.min(totalPages, start + 6);
+  start = Math.max(1, end - 6);
+
+  if (start > 1) {
+    addBtn('1', 1);
+    if (start > 2) container.appendChild(createEl('span', '', '…'));
+  }
+  for (let p = start; p <= end; p++) {
+    addBtn(String(p), p, p === currentPage);
+  }
+  if (end < totalPages) {
+    if (end < totalPages - 1) container.appendChild(createEl('span', '', '…'));
+    addBtn(String(totalPages), totalPages);
+  }
+
+  addBtn('›', currentPage + 1, false, currentPage === totalPages);
+}
+
+function renderCards(filtered) {
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+
+  const dropZone = document.getElementById('drop-zone');
+
+  if (allBookmarks.length === 0) {
+    dropZone.style.display = '';
+    grid.appendChild(createEmptyState('ブックマークがありません', 'bookmarks.json をインポートしてください。\ncollector.js を x.com/i/bookmarks で実行してファイルを生成できます。'));
+    return;
+  }
+
+  dropZone.style.display = 'none';
+
+  if (filtered.length === 0) {
+    grid.appendChild(createEmptyState('検索結果なし', '別のキーワードやタグでお試しください。'));
+    return;
+  }
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page = filtered.slice(start, start + PAGE_SIZE);
+
+  page.forEach((bm) => {
+    grid.appendChild(buildCard(bm));
+  });
+}
+
+function createEmptyState(title, sub) {
+  const div = createEl('div', 'empty-state');
+  const icon = createEl('div', 'es-icon', '🔍');
+  const t = createEl('div', 'es-title', title);
+  const s = createEl('div', 'es-sub', sub);
+  div.appendChild(icon);
+  div.appendChild(t);
+  div.appendChild(s);
+  return div;
+}
+
+function buildCard(bm) {
+  const card = createEl('div', 'card');
+  card.dataset.id = bm.id;
+
+  // Header
+  const header = createEl('div', 'card-header');
+
+  const avatar = createEl('div', 'avatar', getInitial(bm.author_name));
+  header.appendChild(avatar);
+
+  const meta = createEl('div', 'card-meta');
+  const author = createEl('div', 'card-author', bm.author_name || '(名無し)');
+  const screen = createEl('div', 'card-screen-name', '@' + (bm.author_screen_name || ''));
+  meta.appendChild(author);
+  meta.appendChild(screen);
+  header.appendChild(meta);
+
+  const date = createEl('div', 'card-date', formatDate(bm.created_at));
+  header.appendChild(date);
+
+  card.appendChild(header);
+
+  // Text
+  const textEl = document.createElement('div');
+  textEl.className = 'card-text';
+  textEl.innerHTML = linkifyText(bm.text || '');
+  card.appendChild(textEl);
+
+  // Images
+  if (bm.media_urls && bm.media_urls.length > 0) {
+    const imgGrid = createEl('div', `card-images count-${Math.min(bm.media_urls.length, 4)}`);
+    bm.media_urls.slice(0, 4).forEach((url) => {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'ツイート画像';
+      img.loading = 'lazy';
+      img.addEventListener('click', () => openLightbox(url));
+      imgGrid.appendChild(img);
+    });
+    card.appendChild(imgGrid);
+  }
+
+  // Tags
+  card.appendChild(buildTagsSection(bm.id));
+
+  return card;
+}
+
+function buildTagsSection(id) {
+  const tags = tagsMap[id] || [];
+  const section = createEl('div', 'card-tags');
+  section.dataset.tagSection = id;
+
+  tags.forEach((tag) => {
+    section.appendChild(buildTagChip(id, tag));
+  });
+
+  // Add tag trigger
+  const trigger = createEl('button', 'add-tag-trigger', '+ タグ');
+  trigger.addEventListener('click', () => showAddTagForm(id, trigger));
+  section.appendChild(trigger);
+
+  return section;
+}
+
+function buildTagChip(id, tag) {
+  const chip = createEl('span', 'card-tag');
+  const label = createEl('span', '', '#' + tag);
+  const del = createEl('span', 'del-tag', '✕');
+  del.title = 'タグを削除';
+  del.addEventListener('click', (e) => {
+    e.stopPropagation();
+    removeTag(id, tag);
+  });
+  chip.appendChild(label);
+  chip.appendChild(del);
+  return chip;
+}
+
+function showAddTagForm(id, trigger) {
+  // 既にフォームが開いていれば何もしない
+  if (trigger.parentNode.querySelector('.add-tag-form')) return;
+
+  const form = createEl('span', 'add-tag-form');
+  const input = createEl('input', 'add-tag-input');
+  input.placeholder = 'タグ名';
+  input.maxLength = 30;
+
+  const addBtn = createEl('button', 'add-tag-btn', '追加');
+
+  const doAdd = () => {
+    const tag = input.value.trim().replace(/^#+/, '');
+    if (tag) addTag(id, tag);
+    form.remove();
+    trigger.style.display = '';
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doAdd();
+    if (e.key === 'Escape') { form.remove(); trigger.style.display = ''; }
+  });
+
+  addBtn.addEventListener('click', doAdd);
+
+  form.appendChild(input);
+  form.appendChild(addBtn);
+  trigger.style.display = 'none';
+  trigger.after(form);
+  input.focus();
+}
+
+async function addTag(id, tag) {
+  if (!tagsMap[id]) tagsMap[id] = [];
+  if (tagsMap[id].includes(tag)) return;
+  tagsMap[id].push(tag);
+  await putToStore(STORE_TAGS, { id, tags: tagsMap[id] });
+  refreshTagSection(id);
+  renderTagFilter();
+}
+
+async function removeTag(id, tag) {
+  if (!tagsMap[id]) return;
+  tagsMap[id] = tagsMap[id].filter((t) => t !== tag);
+  await putToStore(STORE_TAGS, { id, tags: tagsMap[id] });
+  refreshTagSection(id);
+  renderTagFilter();
+  // アクティブタグが消えたら解除
+  if (activeTag === tag && !Object.values(tagsMap).some((tags) => tags.includes(tag))) {
+    activeTag = null;
+    render();
+  }
+}
+
+function refreshTagSection(id) {
+  const section = document.querySelector(`[data-tag-section="${id}"]`);
+  if (!section) return;
+  const newSection = buildTagsSection(id);
+  section.replaceWith(newSection);
+}
+
+// ===== Lightbox =====
+function openLightbox(url) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = url;
+  lb.classList.add('open');
+}
+
+document.getElementById('lightbox').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+});
+
+// ===== Main render =====
+function render() {
+  const filtered = getFiltered();
+  renderStats(filtered);
+  renderTagFilter();
+  renderCards(filtered);
+  renderPagination(filtered.length);
+}
+
+// ===== Import =====
+async function importBookmarks(jsonText) {
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    showToast('JSONの解析に失敗しました。ファイルを確認してください。', 'error');
+    return;
+  }
+
+  const bookmarks = parsed.bookmarks;
+  if (!Array.isArray(bookmarks)) {
+    showToast('bookmarks フィールドが見つかりません。', 'error');
+    return;
+  }
+
+  const existingIds = new Set(allBookmarks.map((b) => b.id));
+  let added = 0;
+  let skipped = 0;
+
+  for (const bm of bookmarks) {
+    if (!bm.id) continue;
+    if (existingIds.has(bm.id)) {
+      skipped++;
+      continue;
+    }
+    const record = {
+      id: String(bm.id),
+      text: bm.text || '',
+      author_name: bm.author_name || '',
+      author_screen_name: bm.author_screen_name || '',
+      created_at: bm.created_at || '',
+      media_urls: Array.isArray(bm.media_urls) ? bm.media_urls : [],
+    };
+    await putToStore(STORE_BOOKMARKS, record);
+    allBookmarks.push(record);
+    existingIds.add(record.id);
+    added++;
+  }
+
+  showToast(`${added} 件追加、${skipped} 件スキップ`, added > 0 ? 'success' : '');
+  currentPage = 1;
+  render();
+}
+
+// ===== File input & Drop zone =====
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => importBookmarks(ev.target.result);
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('click', () => document.getElementById('file-input').click());
+
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+
+document.addEventListener('dragleave', (e) => {
+  if (!e.relatedTarget) dropZone.classList.remove('dragover');
+});
+
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.name.endsWith('.json')) {
+    showToast('JSONファイルをドロップしてください。', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => importBookmarks(ev.target.result);
+  reader.readAsText(file);
+});
+
+// ===== Search =====
+let searchTimer = null;
+document.getElementById('search-input').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchQuery = e.target.value.trim();
+    currentPage = 1;
+    render();
+  }, 250);
+});
+
+// ===== Clear all =====
+document.getElementById('clear-btn').addEventListener('click', async () => {
+  if (!allBookmarks.length) return;
+  if (!confirm('すべてのブックマークとタグを削除しますか？この操作は元に戻せません。')) return;
+  await clearStore(STORE_BOOKMARKS);
+  await clearStore(STORE_TAGS);
+  allBookmarks = [];
+  tagsMap = {};
+  activeTag = null;
+  currentPage = 1;
+  showToast('データを削除しました。');
+  render();
+});
+
+// ===== Boot =====
+async function init() {
+  db = await openDB();
+
+  // Load bookmarks
+  const stored = await getAllFromStore(STORE_BOOKMARKS);
+  // 新しい順にソート
+  stored.sort((a, b) => {
+    if (!a.created_at) return 1;
+    if (!b.created_at) return -1;
+    return b.created_at.localeCompare(a.created_at);
+  });
+  allBookmarks = stored;
+
+  // Load tags
+  const storedTags = await getAllFromStore(STORE_TAGS);
+  storedTags.forEach((t) => { tagsMap[t.id] = t.tags; });
+
+  render();
+}
+
+init().catch((err) => {
+  console.error('初期化エラー:', err);
+  showToast('初期化に失敗しました。ブラウザのコンソールを確認してください。', 'error');
+});
+</script>
+</body>
+</html>

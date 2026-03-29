@@ -598,8 +598,6 @@
       <span>🔖</span>
       <span>X Bookmark Manager</span>
     </div>
-    <button class="btn btn-ghost" id="select-mode-btn">☑ 選択</button>
-    <button class="btn btn-ghost" id="clear-btn" title="すべてのデータを削除">🗑 全削除</button>
   </div>
 </header>
 
@@ -638,8 +636,10 @@
       <span class="icon">🔍</span>
       <input type="text" id="search-input" placeholder="キーワードで検索..." autocomplete="off" />
     </div>
+    <button class="btn btn-ghost" id="select-mode-btn">☑ 選択</button>
     <label for="file-input" class="btn btn-primary" id="bb-import">インポート</label>
     <input type="file" id="file-input" accept=".json" />
+    <button class="btn btn-ghost" id="clear-btn" title="すべてのデータを削除">🗑</button>
     <!-- Selection mode (hidden by default) -->
     <span id="bb-select-info" style="display:none; font-size:0.88rem; color:var(--text-muted); flex:1"></span>
     <button class="btn btn-ghost" id="bb-select-all" style="display:none">すべて選択</button>
@@ -1155,10 +1155,11 @@ function enterSelectionMode() {
   selectionMode = true;
   selectedIds.clear();
   document.getElementById('cards-grid').classList.add('selection-mode');
-  document.getElementById('select-mode-btn').textContent = '✕ 選択解除';
-  // bottom bar
+  // bottom bar: 通常UIを隠して選択UIを表示
   document.getElementById('bb-search').style.display = 'none';
+  document.getElementById('select-mode-btn').style.display = 'none';
   document.getElementById('bb-import').style.display = 'none';
+  document.getElementById('clear-btn').style.display = 'none';
   document.getElementById('bb-select-info').style.display = '';
   document.getElementById('bb-select-all').style.display = '';
   document.getElementById('bb-delete-selected').style.display = '';
@@ -1171,10 +1172,11 @@ function exitSelectionMode() {
   selectionMode = false;
   selectedIds.clear();
   document.getElementById('cards-grid').classList.remove('selection-mode');
-  document.getElementById('select-mode-btn').textContent = '☑ 選択';
-  // bottom bar
+  // bottom bar: 通常UIを復元
   document.getElementById('bb-search').style.display = '';
+  document.getElementById('select-mode-btn').style.display = '';
   document.getElementById('bb-import').style.display = '';
+  document.getElementById('clear-btn').style.display = '';
   document.getElementById('bb-select-info').style.display = 'none';
   document.getElementById('bb-select-all').style.display = 'none';
   document.getElementById('bb-delete-selected').style.display = 'none';

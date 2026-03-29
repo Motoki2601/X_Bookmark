@@ -124,6 +124,7 @@
       max-width: 900px;
       margin: 0 auto;
       padding: 16px;
+      padding-bottom: 80px;
     }
 
     /* ===== Stats bar ===== */
@@ -214,6 +215,7 @@
     }
 
     .card {
+      position: relative;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -421,7 +423,7 @@
     /* ===== Toast ===== */
     .toast-container {
       position: fixed;
-      bottom: 20px;
+      bottom: 74px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 2000;
@@ -475,6 +477,100 @@
     .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     .page-btn:disabled { opacity: 0.35; cursor: default; }
 
+    /* ===== Bottom bar ===== */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(15, 17, 23, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      padding: 10px 16px;
+    }
+
+    .bottom-bar-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ===== Selection mode ===== */
+    .card-checkbox-wrap {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+
+    .selection-mode .card-checkbox-wrap { display: block; }
+
+    .card-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
+    .card.selected {
+      border-color: var(--accent);
+      background: rgba(29, 155, 240, 0.06);
+    }
+
+    .selection-mode .card { cursor: pointer; }
+
+    /* ===== Custom Modal ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 3000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      max-width: 360px;
+      width: 100%;
+    }
+
+    .modal-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .modal-body {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .btn-danger:hover { background: #dc2626; }
+
     /* ===== Responsive ===== */
     @media (max-width: 600px) {
       .header-inner { gap: 8px; }
@@ -502,12 +598,7 @@
       <span>🔖</span>
       <span>X Bookmark Manager</span>
     </div>
-    <div class="search-bar">
-      <span class="icon">🔍</span>
-      <input type="text" id="search-input" placeholder="キーワードで検索..." autocomplete="off" />
-    </div>
-    <label for="file-input" class="btn btn-primary">インポート</label>
-    <input type="file" id="file-input" accept=".json" />
+    <button class="btn btn-ghost" id="select-mode-btn">☑ 選択</button>
     <button class="btn btn-ghost" id="clear-btn" title="すべてのデータを削除">🗑 全削除</button>
   </div>
 </header>
@@ -539,9 +630,39 @@
   <div class="pagination" id="pagination"></div>
 </main>
 
+<!-- Bottom bar -->
+<div class="bottom-bar" id="bottom-bar">
+  <div class="bottom-bar-inner" id="bottom-bar-inner">
+    <!-- Normal mode -->
+    <div class="search-bar" id="bb-search" style="flex:1">
+      <span class="icon">🔍</span>
+      <input type="text" id="search-input" placeholder="キーワードで検索..." autocomplete="off" />
+    </div>
+    <label for="file-input" class="btn btn-primary" id="bb-import">インポート</label>
+    <input type="file" id="file-input" accept=".json" />
+    <!-- Selection mode (hidden by default) -->
+    <span id="bb-select-info" style="display:none; font-size:0.88rem; color:var(--text-muted); flex:1"></span>
+    <button class="btn btn-ghost" id="bb-select-all" style="display:none">すべて選択</button>
+    <button class="btn btn-danger" id="bb-delete-selected" style="display:none">削除</button>
+    <button class="btn btn-ghost" id="bb-cancel-select" style="display:none">キャンセル</button>
+  </div>
+</div>
+
 <!-- Lightbox -->
 <div class="lightbox" id="lightbox">
   <img id="lightbox-img" src="" alt="拡大画像" />
+</div>
+
+<!-- Custom confirm modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-cancel">キャンセル</button>
+      <button class="btn btn-danger" id="modal-confirm">削除する</button>
+    </div>
+  </div>
 </div>
 
 <!-- Toast container -->
@@ -616,6 +737,8 @@ let searchQuery = '';
 let activeTag = null;
 let currentPage = 1;
 const PAGE_SIZE = 20;
+let selectionMode = false;
+let selectedIds = new Set();
 
 // ===== Toast =====
 function showToast(msg, type = '') {
@@ -822,6 +945,27 @@ function createEmptyState(title, sub) {
 function buildCard(bm) {
   const card = createEl('div', 'card');
   card.dataset.id = bm.id;
+  if (selectedIds.has(bm.id)) card.classList.add('selected');
+
+  // Checkbox (selection mode)
+  const cbWrap = createEl('div', 'card-checkbox-wrap');
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'card-checkbox';
+  cb.checked = selectedIds.has(bm.id);
+  cb.addEventListener('change', (e) => {
+    e.stopPropagation();
+    toggleCardSelection(bm.id, card, cb);
+  });
+  cbWrap.appendChild(cb);
+  card.appendChild(cbWrap);
+
+  // Card click in selection mode
+  card.addEventListener('click', (e) => {
+    if (!selectionMode) return;
+    if (e.target.closest('.card-checkbox-wrap')) return;
+    toggleCardSelection(bm.id, card, cb);
+  });
 
   // Header
   const header = createEl('div', 'card-header');
@@ -959,6 +1103,128 @@ function refreshTagSection(id) {
   section.replaceWith(newSection);
 }
 
+// ===== Custom Confirm Modal =====
+let _modalConfirmCb = null;
+
+function showConfirm(title, body, onConfirm) {
+  _modalConfirmCb = onConfirm;
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent = body;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.remove('open');
+  _modalConfirmCb = null;
+});
+
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.remove('open');
+  if (_modalConfirmCb) { _modalConfirmCb(); _modalConfirmCb = null; }
+});
+
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('open');
+    _modalConfirmCb = null;
+  }
+});
+
+// ===== Selection Mode =====
+function toggleCardSelection(id, card, cb) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+    card.classList.remove('selected');
+    cb.checked = false;
+  } else {
+    selectedIds.add(id);
+    card.classList.add('selected');
+    cb.checked = true;
+  }
+  updateBottomBarSelection();
+}
+
+function updateBottomBarSelection() {
+  const count = selectedIds.size;
+  document.getElementById('bb-select-info').textContent = `${count} 件を選択中`;
+  document.getElementById('bb-delete-selected').textContent = `削除 (${count})`;
+  document.getElementById('bb-delete-selected').disabled = count === 0;
+}
+
+function enterSelectionMode() {
+  selectionMode = true;
+  selectedIds.clear();
+  document.getElementById('cards-grid').classList.add('selection-mode');
+  document.getElementById('select-mode-btn').textContent = '✕ 選択解除';
+  // bottom bar
+  document.getElementById('bb-search').style.display = 'none';
+  document.getElementById('bb-import').style.display = 'none';
+  document.getElementById('bb-select-info').style.display = '';
+  document.getElementById('bb-select-all').style.display = '';
+  document.getElementById('bb-delete-selected').style.display = '';
+  document.getElementById('bb-cancel-select').style.display = '';
+  updateBottomBarSelection();
+  render();
+}
+
+function exitSelectionMode() {
+  selectionMode = false;
+  selectedIds.clear();
+  document.getElementById('cards-grid').classList.remove('selection-mode');
+  document.getElementById('select-mode-btn').textContent = '☑ 選択';
+  // bottom bar
+  document.getElementById('bb-search').style.display = '';
+  document.getElementById('bb-import').style.display = '';
+  document.getElementById('bb-select-info').style.display = 'none';
+  document.getElementById('bb-select-all').style.display = 'none';
+  document.getElementById('bb-delete-selected').style.display = 'none';
+  document.getElementById('bb-cancel-select').style.display = 'none';
+  render();
+}
+
+async function deleteSelected() {
+  const ids = Array.from(selectedIds);
+  if (ids.length === 0) return;
+  for (const id of ids) {
+    await dbTx(STORE_BOOKMARKS, 'readwrite', (store) => store.delete(id));
+    await dbTx(STORE_TAGS, 'readwrite', (store) => store.delete(id));
+    delete tagsMap[id];
+  }
+  allBookmarks = allBookmarks.filter((b) => !selectedIds.has(b.id));
+  showToast(`${ids.length} 件を削除しました`, 'success');
+  exitSelectionMode();
+}
+
+document.getElementById('select-mode-btn').addEventListener('click', () => {
+  selectionMode ? exitSelectionMode() : enterSelectionMode();
+});
+
+document.getElementById('bb-cancel-select').addEventListener('click', exitSelectionMode);
+
+document.getElementById('bb-select-all').addEventListener('click', () => {
+  const filtered = getFiltered();
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page = filtered.slice(start, start + PAGE_SIZE);
+  const allSelected = page.every((b) => selectedIds.has(b.id));
+  if (allSelected) {
+    page.forEach((b) => selectedIds.delete(b.id));
+  } else {
+    page.forEach((b) => selectedIds.add(b.id));
+  }
+  updateBottomBarSelection();
+  render();
+});
+
+document.getElementById('bb-delete-selected').addEventListener('click', () => {
+  const count = selectedIds.size;
+  if (count === 0) return;
+  showConfirm(
+    `${count} 件を削除しますか？`,
+    'この操作は元に戻せません。選択したブックマークとそのタグが削除されます。',
+    deleteSelected
+  );
+});
+
 // ===== Lightbox =====
 function openLightbox(url) {
   const lb = document.getElementById('lightbox');
@@ -1072,17 +1338,23 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 });
 
 // ===== Clear all =====
-document.getElementById('clear-btn').addEventListener('click', async () => {
+document.getElementById('clear-btn').addEventListener('click', () => {
   if (!allBookmarks.length) return;
-  if (!confirm('すべてのブックマークとタグを削除しますか？この操作は元に戻せません。')) return;
-  await clearStore(STORE_BOOKMARKS);
-  await clearStore(STORE_TAGS);
-  allBookmarks = [];
-  tagsMap = {};
-  activeTag = null;
-  currentPage = 1;
-  showToast('データを削除しました。');
-  render();
+  showConfirm(
+    'すべてのデータを削除しますか？',
+    `${allBookmarks.length} 件のブックマークとすべてのタグが削除されます。この操作は元に戻せません。`,
+    async () => {
+      await clearStore(STORE_BOOKMARKS);
+      await clearStore(STORE_TAGS);
+      allBookmarks = [];
+      tagsMap = {};
+      activeTag = null;
+      currentPage = 1;
+      if (selectionMode) exitSelectionMode();
+      showToast('データを削除しました。');
+      render();
+    }
+  );
 });
 
 // ===== Boot =====
